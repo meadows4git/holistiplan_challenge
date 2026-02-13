@@ -2,30 +2,23 @@
 import { ref, onMounted, computed } from 'vue';
 import { useServersStore } from '../stores/servers';
 import EditServerModal from '../components/EditServerModal.vue';
-import filterMethods from '../helpers/filterMethods';
+import ServerFilters from '../components/ServerFilters.vue';
+import ServersTable from '../components/ServersTable.vue';
 
 export default {
   name: 'ServersView',
   components: {
-    EditServerModal
+    EditServerModal,
+    ServerFilters,
+    ServersTable
   },
   setup() {
     const serversStore = useServersStore();
-    const servers = computed(() => serversStore.servers);
+    const servers = computed(() => serversStore.filteredServers);
     const showDeleteModal = ref(false);
     const serverToDelete = ref(null);
     const showEditModal = ref(false);
     const serverToEdit = ref(null);
-
-    const getStatusColor = (status) => {
-      const colors = {
-        online: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
-        offline: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-        maintenance: 'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30',
-        error: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30'
-      };
-      return colors[status] || 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-800';
-    };
 
     const confirmDelete = (server) => {
       serverToDelete.value = server;
@@ -58,6 +51,7 @@ export default {
       // The store will automatically update the servers list
       // but we can add any additional logic here if needed
       console.warn('Server updated:', updatedServer);
+      // Plan to place a success notification here in the future
     };
 
     onMounted(() => {
@@ -65,18 +59,17 @@ export default {
     });
 
     return {
+      serversStore,
       servers,
       showDeleteModal,
       serverToDelete,
       showEditModal,
       serverToEdit,
-      getStatusColor,
       confirmDelete,
       deleteServer,
       editServer,
       handleEditClose,
-      handleEditSaved,
-      ...filterMethods
+      handleEditSaved
     };
   }
 };
@@ -99,96 +92,17 @@ export default {
       </div>
     </div>
 
+    <!-- Server Filters -->
+     <ServerFilters :showing-max="servers.length" />
+     
     <!-- Servers Table -->
-    <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Server
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Location
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Usage
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Uptime
-              </th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr
-              v-for="server in servers"
-              :key="server.id"
-            >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ server.name }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.hostname }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.ip_address }}</div>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span
-                  class="inline-flex px-2 text-xs font-semibold rounded-full"
-                  :class="getStatusColor(server.status)"
-                >
-                  {{ server.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900 dark:text-gray-100">{{ server.location }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.os }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  CPU: {{ formatPercent(server.cpu_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Memory: {{ formatPercent(server.memory_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Disk: {{ formatPercent(server.disk_usage) }}%
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {{ formatUptime(server.uptime) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  @click="editServer(server)"
-                  class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-3"
-                >
-                  Edit
-                </button>
-                <button
-                  @click="confirmDelete(server)"
-                  class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div
-        v-if="servers.length === 0"
-        class="text-center py-12"
-      >
-        <p class="text-gray-500 dark:text-gray-400">No servers found.</p>
-      </div>
-    </div>
+    <ServersTable
+      :servers="servers"
+      :show-actions="true"
+      :show-sorting="true"
+      @edit="editServer"
+      @delete="confirmDelete"
+    />
 
     <!-- Delete Confirmation Modal -->
     <div

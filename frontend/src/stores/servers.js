@@ -9,6 +9,20 @@ export const useServersStore = defineStore('servers', () => {
   const error = ref(null);
   const lastUpdated = ref(null);
 
+  // Dashboard filters
+  const filters = ref({
+    location: '',
+    status: '',
+    searchText: '',
+    ipAddress: ''
+  });
+
+  // Sorting
+  const sortConfig = ref({
+    field: '',
+    direction: '' // 'asc' or 'desc'
+  });
+
   const serversByStatus = computed(() => {
     const grouped = {
       online: [],
@@ -27,6 +41,78 @@ export const useServersStore = defineStore('servers', () => {
   });
 
   const totalServers = computed(() => servers.value.length);
+
+  // Apply filters and sorting to get the final list of servers to display
+  const filteredServers = computed(() => {
+    let filtered = servers.value;
+
+    // Apply filters
+    if (filters.value.location) {
+      filtered = filtered.filter(s => s.location === filters.value.location);
+    }
+
+    if (filters.value.status) {
+      filtered = filtered.filter(s => s.status === filters.value.status);
+    }
+
+    if (filters.value.searchText) {
+      const search = filters.value.searchText.toLowerCase();
+      filtered = filtered.filter(s =>
+        s.name.toLowerCase().includes(search)
+      );
+    }
+
+    if (filters.value.ipAddress) {
+      const ipSearch = filters.value.ipAddress.toLowerCase();
+      filtered = filtered.filter(s =>
+        s.ip_address.toLowerCase().includes(ipSearch)
+      );
+    }
+
+    // Apply sorting
+    if (sortConfig.value.field) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal = a[sortConfig.value.field];
+        let bVal = b[sortConfig.value.field];
+
+        // Handle case-insensitive string comparison
+        if (typeof aVal === 'string') {
+          aVal = aVal.toLowerCase();
+          bVal = bVal.toLowerCase();
+        }
+
+        if (aVal < bVal) return sortConfig.value.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.value.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  });
+
+  // Group the filtered servers by status for easier display in the UI
+  const filteredServersByStatus = computed(() => {
+    const grouped = {
+      online: [],
+      offline: [],
+      maintenance: [],
+      error: []
+    };
+
+    filteredServers.value.forEach(server => {
+      if (grouped[server.status]) {
+        grouped[server.status].push(server);
+      }
+    });
+
+    return grouped;
+  });
+
+  // Get unique locations for filter dropdown
+  const uniqueLocations = computed(() => {
+    const locations = new Set(servers.value.map(s => s.location));
+    return Array.from(locations).sort();
+  });
 
   const fetchServers = async () => {
     isLoading.value = true;
@@ -67,6 +153,44 @@ export const useServersStore = defineStore('servers', () => {
     }
   };
 
+  const setFilter = (filterType, value) => {
+    filters.value[filterType] = value;
+  };
+
+  const clearFilters = () => {
+    filters.value = {
+      location: '',
+      status: '',
+      searchText: '',
+      ipAddress: ''
+    };
+  };
+
+  // Sorting logic: clicking the same field toggles between asc, desc, and no sorting
+  const setSortField = (field) => {
+    if (sortConfig.value.field === field) {
+      // Toggle direction
+      if (sortConfig.value.direction === 'asc') {
+        sortConfig.value.direction = 'desc';
+      } else if (sortConfig.value.direction === 'desc') {
+        // Clear sorting
+        sortConfig.value.field = '';
+        sortConfig.value.direction = '';
+      }
+    } else {
+      // Set new field, default to ascending
+      sortConfig.value.field = field;
+      sortConfig.value.direction = 'asc';
+    }
+  };
+
+  const clearSort = () => {
+    sortConfig.value = {
+      field: '',
+      direction: ''
+    };
+  };
+
   const createServer = async (serverData) => {
     isLoading.value = true;
     error.value = null;
@@ -102,6 +226,7 @@ export const useServersStore = defineStore('servers', () => {
     }
   };
 
+  // Remove the server from the list, but revert if the API call fails
   const deleteServer = async (id) => {
     isLoading.value = true;
     error.value = null;
@@ -131,11 +256,20 @@ export const useServersStore = defineStore('servers', () => {
     isLoading,
     error,
     lastUpdated,
+    filters,
+    sortConfig,
     serversByStatus,
     totalServers,
+    filteredServers,
+    filteredServersByStatus,
+    uniqueLocations,
     fetchServers,
     fetchDashboardStats,
     refreshDashboard,
+    setFilter,
+    clearFilters,
+    setSortField,
+    clearSort,
     createServer,
     updateServer,
     deleteServer,
