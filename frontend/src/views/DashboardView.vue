@@ -5,7 +5,7 @@ import StatusChart from '../components/StatusChart.vue';
 import UsageChart from '../components/UsageChart.vue';
 import ServerFilters from '../components/ServerFilters.vue';
 import ServersTable from '../components/ServersTable.vue';
-import filterMethods from '@/helpers/filterMethods';
+import filterMethods from '../helpers/filterMethods';
 
 export default {
   name: 'DashboardView',
