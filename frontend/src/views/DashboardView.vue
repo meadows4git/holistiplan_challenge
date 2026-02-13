@@ -1,15 +1,18 @@
 <script>
-import { onMounted, computed, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, computed, ref } from 'vue';
 import { useServersStore } from '../stores/servers';
 import StatusChart from '../components/StatusChart.vue';
 import UsageChart from '../components/UsageChart.vue';
-import filterMethods from '../helpers/filterMethods';
+import ServerFilters from '../components/ServerFilters.vue';
+import ServersTable from '../components/ServersTable.vue';
 
 export default {
   name: 'DashboardView',
   components: {
     StatusChart,
-    UsageChart
+    UsageChart,
+    ServerFilters,
+    ServersTable
   },
   setup() {
     const serversStore = useServersStore();
@@ -29,6 +32,31 @@ export default {
       return serversStore.dashboardStats.average_usage;
     });
 
+    const filteredStatusCounts = computed(() => {
+      const grouped = serversStore.filteredServersByStatus;
+      return {
+        online: grouped.online.length,
+        offline: grouped.offline.length,
+        maintenance: grouped.maintenance.length,
+        error: grouped.error.length
+      };
+    });
+
+    const filteredAverageUsage = computed(() => {
+      const servers = serversStore.filteredServers;
+      if (servers.length === 0) return { cpu: 0, memory: 0, disk: 0 };
+      
+      const avgCpu = servers.reduce((sum, s) => sum + (s.cpu_usage || 0), 0) / servers.length;
+      const avgMemory = servers.reduce((sum, s) => sum + (s.memory_usage || 0), 0) / servers.length;
+      const avgDisk = servers.reduce((sum, s) => sum + (s.disk_usage || 0), 0) / servers.length;
+      
+      return {
+        cpu: Math.round(avgCpu * 100) / 100,
+        memory: Math.round(avgMemory * 100) / 100,
+        disk: Math.round(avgDisk * 100) / 100
+      };
+    });
+
     const getStatusColor = (status) => {
       const colors = {
         online: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
@@ -43,7 +71,7 @@ export default {
       if (!date) return 'Never';
       let diff = Math.floor((currentTime.value - date.getTime()) / 1000); // seconds
       diff = diff < 0 ? 0 : diff; // Handle future timestamps gracefully, prevents from showing -1 for a second.
-
+      
       if (diff < 60) return `${diff}s ago`;
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
       if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -61,7 +89,6 @@ export default {
       autoRefreshEnabled.value = !autoRefreshEnabled.value;
       
       if (autoRefreshEnabled.value) {
-        refreshData();
         startAutoRefresh();
       } else {
         stopAutoRefresh();
@@ -118,14 +145,15 @@ export default {
       serversStore,
       statusCounts,
       averageUsage,
-      getStatusColor,
+      filteredStatusCounts,
+      filteredAverageUsage,
       autoRefreshEnabled,
       autoRefreshInterval,
+      getStatusColor,
       formatLastUpdated,
       refreshData,
       toggleAutoRefresh,
-      updateAutoRefreshInterval,
-      ...filterMethods
+      updateAutoRefreshInterval
     };
   }
 };
@@ -216,33 +244,42 @@ export default {
       </div>
     </div>
 
+    <!-- Server Filters -->
+    <ServerFilters :showing-max="10" />
+
     <!-- Stats Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
       <div class="card p-6">
         <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Servers</h3>
         <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
-          {{ serversStore.dashboardStats?.total_servers || 0 }}
+          {{ serversStore.filteredServers.length }}
         </p>
       </div>
       
       <div class="card p-6">
         <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Online</h3>
         <p class="text-3xl font-bold text-green-600 dark:text-green-400">
-          {{ statusCounts.online || 0 }}
+          {{ filteredStatusCounts.online || 0 }}
         </p>
       </div>
       
       <div class="card p-6">
         <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Offline</h3>
         <p class="text-3xl font-bold text-red-600 dark:text-red-400">
-          {{ statusCounts.offline || 0 }}
+          {{ filteredStatusCounts.offline || 0 }}
         </p>
       </div>
       
       <div class="card p-6">
         <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Maintenance</h3>
         <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-          {{ statusCounts.maintenance || 0 }}
+          {{ filteredStatusCounts.maintenance || 0 }}
+        </p>
+      </div>
+      <div class="card p-6">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Error</h3>
+        <p class="text-3xl font-bold text-red-600 dark:text-red-400">
+          {{ filteredStatusCounts.error || 0 }}
         </p>
       </div>
     </div>
@@ -251,94 +288,33 @@ export default {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <div class="card p-6">
         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Server Status Distribution</h3>
-        <StatusChart :data="statusCounts" />
+        <StatusChart :data="filteredStatusCounts" />
       </div>
       
       <div class="card p-6">
         <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Average Resource Usage</h3>
-        <UsageChart :data="averageUsage" />
+        <UsageChart :data="filteredAverageUsage" />
       </div>
     </div>
 
-    <!-- Recent Servers -->
-    <div class="card">
-      <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Servers</h3>
-      </div>
-      
-      <div class="overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Server
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Location
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Usage
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Uptime
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr
-              v-for="server in serversStore.servers.slice(0, 10)"
-              :key="server.id"
-            >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ server.name }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.hostname }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.ip_address }}</div>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span 
-                  class="inline-flex px-2 text-xs font-semibold rounded-full"
-                  :class="getStatusColor(server.status)"
-                >
-                  {{ server.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                <div class="text-sm text-gray-900 dark:text-gray-100">{{ server.location }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.os }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  CPU: {{ formatPercent(server.cpu_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Memory: {{ formatPercent(server.memory_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Disk: {{ formatPercent(server.disk_usage) }}%
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {{ formatUptime(server.uptime) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 text-right">
-        <RouterLink 
-          to="/servers"
-          class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
-        >
-          View all servers →
-        </RouterLink>
-      </div>
-    </div>
+    <!-- Recent Servers Table -->
+    <ServersTable
+      :servers="serversStore.filteredServers"
+      :max-rows="10"
+      :show-sorting="true"
+      :title="(serversStore.filters.status || serversStore.filters.location) ? 'Recent Servers (Filtered)' : 'Recent Servers'"
+    >
+      <template #footer>
+        <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 text-right">
+          <RouterLink 
+            to="/servers"
+            class="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300"
+          >
+            View all servers →
+          </RouterLink>
+        </div>
+      </template>
+    </ServersTable>
   </div>
 </template>
 
