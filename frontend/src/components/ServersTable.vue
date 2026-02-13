@@ -21,6 +21,10 @@ export default {
       type: Boolean,
       default: false
     },
+    showBulkSelection: {
+      type: Boolean,
+      default: false
+    },
     title: {
       type: String,
       default: ''
@@ -29,6 +33,24 @@ export default {
   emits: ['edit', 'delete'],
   setup(props, { emit }) {
     const serversStore = useServersStore();
+
+    const isSelected = (serverId) => {
+      return serversStore.selectedServerIds.has(serverId);
+    };
+
+    const allSelected = () => {
+      if (props.servers.length === 0) return false;
+      return props.servers.every(server => serversStore.selectedServerIds.has(server.id));
+    };
+
+    const toggleSelection = (serverId) => {
+      serversStore.toggleServerSelection(serverId);
+    };
+
+    const toggleAll = () => {
+      const serverIds = props.servers.map(s => s.id);
+      serversStore.toggleAllServers(serverIds);
+    };
 
     const getStatusColor = (status) => {
       const colors = {
@@ -70,6 +92,10 @@ export default {
 
     return {
       serversStore,
+      isSelected,
+      allSelected,
+      toggleSelection,
+      toggleAll,
       getStatusColor,
       handleSort,
       getSortIcon,
@@ -93,6 +119,14 @@ export default {
       <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-700">
           <tr>
+            <th v-if="showBulkSelection" class="px-6 py-3 text-left">
+              <input
+                type="checkbox"
+                :checked="allSelected()"
+                @change="toggleAll"
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
+              />
+            </th>
             <th 
               @click="handleSort('name', $event)"
               :class="[
@@ -166,6 +200,14 @@ export default {
             v-for="server in displayedServers()"
             :key="server.id"
           >
+            <td v-if="showBulkSelection" class="px-6 py-4 whitespace-nowrap">
+              <input
+                type="checkbox"
+                :checked="isSelected(server.id)"
+                @change="toggleSelection(server.id)"
+                class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
+              />
+            </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div>
                 <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ server.name }}</div>
