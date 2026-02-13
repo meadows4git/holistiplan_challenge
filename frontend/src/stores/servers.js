@@ -7,6 +7,7 @@ export const useServersStore = defineStore('servers', () => {
   const dashboardStats = ref(null);
   const isLoading = ref(false);
   const error = ref(null);
+  const lastUpdated = ref(null);
 
   const serversByStatus = computed(() => {
     const grouped = {
@@ -15,13 +16,13 @@ export const useServersStore = defineStore('servers', () => {
       maintenance: [],
       error: []
     };
-    
+
     servers.value.forEach(server => {
       if (grouped[server.status]) {
         grouped[server.status].push(server);
       }
     });
-    
+
     return grouped;
   });
 
@@ -30,7 +31,7 @@ export const useServersStore = defineStore('servers', () => {
   const fetchServers = async () => {
     isLoading.value = true;
     error.value = null;
-    
+
     try {
       const response = await serversAPI.getServers();
       servers.value = response.data.servers;
@@ -51,10 +52,25 @@ export const useServersStore = defineStore('servers', () => {
     }
   };
 
+  const refreshDashboard = async () => {
+    isLoading.value = true;
+    try {
+      await Promise.all([
+        fetchServers(),
+        fetchDashboardStats()
+      ]);
+      lastUpdated.value = new Date();
+    } catch (err) {
+      error.value = err.message || 'Failed to refresh dashboard';
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const createServer = async (serverData) => {
     isLoading.value = true;
     error.value = null;
-    
+
     try {
       const response = await serversAPI.createServer(serverData);
       servers.value.push(response.data.server);
@@ -70,7 +86,7 @@ export const useServersStore = defineStore('servers', () => {
   const updateServer = async (id, serverData) => {
     isLoading.value = true;
     error.value = null;
-    
+
     try {
       const response = await serversAPI.updateServer(id, serverData);
       const index = servers.value.findIndex(s => s.id === id);
@@ -89,7 +105,7 @@ export const useServersStore = defineStore('servers', () => {
   const deleteServer = async (id) => {
     isLoading.value = true;
     error.value = null;
-    
+
     try {
       await serversAPI.deleteServer(id);
       servers.value = servers.value.filter(s => s.id !== id);
@@ -114,10 +130,12 @@ export const useServersStore = defineStore('servers', () => {
     dashboardStats,
     isLoading,
     error,
+    lastUpdated,
     serversByStatus,
     totalServers,
     fetchServers,
     fetchDashboardStats,
+    refreshDashboard,
     createServer,
     updateServer,
     deleteServer,
