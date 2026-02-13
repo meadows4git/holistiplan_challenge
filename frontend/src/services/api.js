@@ -48,7 +48,9 @@ export const serversAPI = {
   getServer: (id) => api.get(`/servers/${id}`),
   createServer: (serverData) => api.post('/servers', serverData),
   updateServer: (id, serverData) => api.put(`/servers/${id}`, serverData),
-  deleteServer: (id) => api.delete(`/servers/${id}`)
+  deleteServer: (id) => api.delete(`/servers/${id}`),
+  bulkDelete: (serverIds) => api.post('/servers/bulk/delete', { server_ids: serverIds }),
+  bulkUpdateStatus: (serverIds, status) => api.post('/servers/bulk/update-status', { server_ids: serverIds, status })
 };
 
 // Dashboard API

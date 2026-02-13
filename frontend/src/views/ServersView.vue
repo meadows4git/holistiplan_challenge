@@ -2,30 +2,28 @@
 import { ref, onMounted, computed } from 'vue';
 import { useServersStore } from '../stores/servers';
 import EditServerModal from '../components/EditServerModal.vue';
-import filterMethods from '../helpers/filterMethods';
+import ServerFilters from '../components/ServerFilters.vue';
+import ServersTable from '../components/ServersTable.vue';
 
 export default {
   name: 'ServersView',
   components: {
-    EditServerModal
+    EditServerModal,
+    ServerFilters,
+    ServersTable
   },
   setup() {
     const serversStore = useServersStore();
-    const servers = computed(() => serversStore.servers);
+    const servers = computed(() => serversStore.filteredServers);
     const showDeleteModal = ref(false);
     const serverToDelete = ref(null);
     const showEditModal = ref(false);
     const serverToEdit = ref(null);
+    const showBulkDeleteModal = ref(false);
+    const showBulkStatusModal = ref(false);
+    const bulkStatusValue = ref('');
 
-    const getStatusColor = (status) => {
-      const colors = {
-        online: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30',
-        offline: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-        maintenance: 'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30',
-        error: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30'
-      };
-      return colors[status] || 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-800';
-    };
+    const selectedCount = computed(() => serversStore.selectedServerIds.size);
 
     const confirmDelete = (server) => {
       serverToDelete.value = server;
@@ -58,14 +56,37 @@ export default {
       // The store will automatically update the servers list
       // but we can add any additional logic here if needed
       console.warn('Server updated:', updatedServer);
+      // Plan to place a success notification here in the future
     };
 
-    const formatUptime = (seconds) => {
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor((seconds % 86400) / 3600);
-      if (days > 0) return `${days}d ${hours}h`;
-      if (hours > 0) return `${hours}h`;
-      return `${Math.floor(seconds / 60)}m`;
+    const confirmBulkDelete = () => {
+      showBulkDeleteModal.value = true;
+    };
+
+    const executeBulkDelete = async () => {
+      try {
+        await serversStore.bulkDeleteServers();
+        showBulkDeleteModal.value = false;
+      } catch (error) {
+        console.error('Failed to delete servers:', error);
+      }
+    };
+
+    const openBulkStatusModal = () => {
+      bulkStatusValue.value = '';
+      showBulkStatusModal.value = true;
+    };
+
+    const executeBulkStatusUpdate = async () => {
+      if (!bulkStatusValue.value) return;
+      
+      try {
+        await serversStore.bulkUpdateStatus(bulkStatusValue.value);
+        showBulkStatusModal.value = false;
+        bulkStatusValue.value = '';
+      } catch (error) {
+        console.error('Failed to update server status:', error);
+      }
     };
 
     onMounted(() => {
@@ -73,19 +94,25 @@ export default {
     });
 
     return {
+      serversStore,
       servers,
       showDeleteModal,
       serverToDelete,
       showEditModal,
       serverToEdit,
-      getStatusColor,
+      showBulkDeleteModal,
+      showBulkStatusModal,
+      bulkStatusValue,
+      selectedCount,
       confirmDelete,
       deleteServer,
       editServer,
       handleEditClose,
       handleEditSaved,
-      formatUptime,
-      ...filterMethods
+      confirmBulkDelete,
+      executeBulkDelete,
+      openBulkStatusModal,
+      executeBulkStatusUpdate
     };
   }
 };
@@ -108,96 +135,55 @@ export default {
       </div>
     </div>
 
-    <!-- Servers Table -->
-    <div class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Server
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Location
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Usage
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Uptime
-              </th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr
-              v-for="server in servers"
-              :key="server.id"
-            >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ server.name }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.hostname }}</div>
-                  <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.ip_address }}</div>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span
-                  class="inline-flex px-2 text-xs font-semibold rounded-full"
-                  :class="getStatusColor(server.status)"
-                >
-                  {{ server.status }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900 dark:text-gray-100">{{ server.location }}</div>
-                <div class="text-sm text-gray-500 dark:text-gray-400">{{ server.os }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  CPU: {{ formatPercent(server.cpu_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Memory: {{ formatPercent(server.memory_usage) }}%
-                </div>
-                <div class="text-sm text-gray-900 dark:text-gray-100">
-                  Disk: {{ formatPercent(server.disk_usage) }}%
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {{ formatUptime(server.uptime) }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  @click="editServer(server)"
-                  class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-3"
-                >
-                  Edit
-                </button>
-                <button
-                  @click="confirmDelete(server)"
-                  class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div
-        v-if="servers.length === 0"
-        class="text-center py-12"
-      >
-        <p class="text-gray-500 dark:text-gray-400">No servers found.</p>
+    <!-- Server Filters -->
+     <ServerFilters :showing-max="servers.length" />
+     
+    <!-- Bulk Operations Toolbar -->
+    <div v-if="selectedCount > 0" class="mb-4 px-4 py-2 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {{ selectedCount }} server{{ selectedCount > 1 ? 's' : '' }} selected
+          </span>
+          <button
+            @click="serversStore.clearSelection()"
+            class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+          >
+            Clear selection
+          </button>
+        </div>
+        <div class="flex gap-2">
+          <button
+            @click="openBulkStatusModal"
+            class="btn btn-secondary flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Update Status
+          </button>
+          <button
+            @click="confirmBulkDelete"
+            class="btn btn-danger flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+        </div>
       </div>
     </div>
+
+    <!-- Servers Table -->
+    <ServersTable
+      :servers="servers"
+      :show-actions="true"
+      :show-sorting="true"
+      :show-bulk-selection="true"
+      @edit="editServer"
+      @delete="confirmDelete"
+    />
 
     <!-- Delete Confirmation Modal -->
     <div
@@ -239,5 +225,85 @@ export default {
       @close="handleEditClose"
       @saved="handleEditSaved"
     />
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <div
+      v-if="showBulkDeleteModal"
+      class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-75 overflow-y-auto h-full w-full z-50"
+    >
+      <div class="relative top-20 mx-auto p-5 border dark:border-gray-600 w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div class="mt-3 text-center">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30">
+            <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mt-4">Delete Multiple Servers</h3>
+          <div class="mt-2 px-7 py-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Are you sure you want to delete <strong class="text-gray-900 dark:text-gray-100">{{ selectedCount }} server{{ selectedCount > 1 ? 's' : '' }}</strong>?
+              This action cannot be undone.
+            </p>
+          </div>
+          <div class="flex justify-center space-x-4 mt-4">
+            <button
+              @click="showBulkDeleteModal = false"
+              class="btn btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              @click="executeBulkDelete"
+              class="btn btn-danger"
+              :disabled="serversStore.isLoading"
+            >
+              {{ serversStore.isLoading ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Status Update Modal -->
+    <div
+      v-if="showBulkStatusModal"
+      class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 dark:bg-opacity-75 overflow-y-auto h-full w-full z-50"
+    >
+      <div class="relative top-20 mx-auto p-5 border dark:border-gray-600 w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+        <div class="mt-3">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 text-center">Update Server Status</h3>
+          <div class="mt-4 px-7 py-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Select the new status for <strong class="text-gray-900 dark:text-gray-100">{{ selectedCount }} server{{ selectedCount > 1 ? 's' : '' }}</strong>:
+            </p>
+            <select
+              v-model="bulkStatusValue"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            >
+              <option value="">Select status...</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+          <div class="flex justify-center space-x-4 mt-4">
+            <button
+              @click="showBulkStatusModal = false"
+              class="btn btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              @click="executeBulkStatusUpdate"
+              class="btn btn-primary"
+              :disabled="!bulkStatusValue || serversStore.isLoading"
+            >
+              {{ serversStore.isLoading ? 'Updating...' : 'Update' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
