@@ -40,14 +40,6 @@ export default {
       return colors[status] || 'text-gray-700 bg-gray-100 dark:text-gray-400 dark:bg-gray-800';
     };
 
-    const formatUptime = (seconds) => {
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor((seconds % 86400) / 3600);
-      if (days > 0) return `${days}d ${hours}h`;
-      if (hours > 0) return `${hours}h`;
-      return `${Math.floor(seconds / 60)}m`;
-    };
-
     const handleSort = (field, event) => {
       if (!props.showSorting) return;
       serversStore.setSortField(field);
@@ -79,7 +71,6 @@ export default {
     return {
       serversStore,
       getStatusColor,
-      formatUptime,
       handleSort,
       getSortIcon,
       displayedServers,
