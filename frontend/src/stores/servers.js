@@ -41,10 +41,50 @@ export const useServersStore = defineStore('servers', () => {
   });
 
   const totalServers = computed(() => servers.value.length);
+  // Calculate health score for a server (0-100, higher is better)
+  // Formula: (100 - CPU*40) + (100 - Memory*40) + (100 - Disk*20)
+  // Where CPU, Memory, Disk are percentages (0-100)
+  const calculateHealthScore = (server) => {
+    // Handle missing or invalid data
+    const cpu = typeof server.cpu_usage === 'number'
+      ? Math.min(100, Math.max(0, server.cpu_usage * 100))
+      : 0;
+    const memory = typeof server.memory_usage === 'number'
+      ? Math.min(100, Math.max(0, server.memory_usage))
+      : 0;
+    const disk = typeof server.disk_usage === 'number'
+      ? Math.min(100, Math.max(0, server.disk_usage * 100))
+      : 0;
+
+    // Calculate weighted health score (lower resource usage = higher health)
+    const cpuHealth = (100 - cpu) * 0.40;
+    const memoryHealth = (100 - memory) * 0.40;
+    const diskHealth = (100 - disk) * 0.20;
+
+    const healthScore = cpuHealth + memoryHealth + diskHealth;
+
+    return Math.round(healthScore);
+  };
+
+  // Add health scores to servers
+  const serversWithHealth = computed(() => {
+    return servers.value.map(server => ({
+      ...server,
+      healthScore: calculateHealthScore(server)
+    }));
+  });
+
+  // Calculate average health score
+  const averageHealthScore = computed(() => {
+    if (serversWithHealth.value.length === 0) return 0;
+    // Average health score across all servers
+    const total = serversWithHealth.value.reduce((sum, s) => sum + s.healthScore, 0);
+    return Math.round(total / serversWithHealth.value.length);
+  });
 
   // Apply filters and sorting to get the final list of servers to display
   const filteredServers = computed(() => {
-    let filtered = servers.value;
+    let filtered = serversWithHealth.value;
 
     // Apply filters
     if (filters.value.location) {
@@ -260,6 +300,9 @@ export const useServersStore = defineStore('servers', () => {
     sortConfig,
     serversByStatus,
     totalServers,
+    serversWithHealth,
+    averageHealthScore,
+    calculateHealthScore,
     filteredServers,
     filteredServersByStatus,
     uniqueLocations,

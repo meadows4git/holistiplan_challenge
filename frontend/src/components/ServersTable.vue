@@ -84,8 +84,9 @@ export default {
 
 <template>
   <div class="card overflow-hidden">
-    <div v-if="title" class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+    <div v-if="title" class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ title }}</h3>
+      <div v-if="maxRows" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ displayedServers().length }} servers</div>
     </div>
 
     <div class="overflow-x-auto">
@@ -130,6 +131,18 @@ export default {
             </th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Usage
+            </th>
+            <th 
+              @click="handleSort('healthScore', $event)"
+              :class="[
+                'px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none',
+                showSorting ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600' : ''
+              ]"
+            >
+              <div class="flex items-center gap-1">
+                Health
+                <span v-if="showSorting" class="text-xs">{{ getSortIcon('healthScore') }}</span>
+              </div>
             </th>
             <th 
               @click="handleSort('uptime', $event)"
@@ -181,6 +194,24 @@ export default {
               </div>
               <div class="text-sm text-gray-900 dark:text-gray-100">
                 Disk: {{ formatPercent(server.disk_usage) }}%
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center gap-2">
+                <span class="text-lg font-bold" :class="getHealthColor(server.healthScore)">
+                  {{ server.healthScore }}
+                </span>
+                <div class="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    class="h-2 rounded-full transition-all"
+                    :class="{
+                      'bg-green-600 dark:bg-green-400': server.healthScore >= 70,
+                      'bg-yellow-600 dark:bg-yellow-400': server.healthScore >= 40 && server.healthScore < 70,
+                      'bg-red-600 dark:bg-red-400': server.healthScore < 40
+                    }"
+                    :style="{ width: server.healthScore + '%' }"
+                  ></div>
+                </div>
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">

@@ -8,6 +8,10 @@ export default {
     showingMax: {
       type: Number,
       default: 0
+    },
+    DisplayShowingCount: {
+      type: Boolean,
+      default: true
     }
   },
   setup(props) {
@@ -90,7 +94,7 @@ export default {
         </button>
         
         <!-- Filter Summary -->
-        <div class="text-sm text-gray-500 dark:text-gray-400 ml-auto">
+        <div v-if="DisplayShowingCount" class="text-sm text-gray-500 dark:text-gray-400 ml-auto">
           Showing {{ Math.min(showingMax, serversStore.filteredServers.length) || 0 }} of {{ serversStore.servers.length }} servers
         </div>
       </div>

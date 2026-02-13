@@ -5,6 +5,7 @@ import StatusChart from '../components/StatusChart.vue';
 import UsageChart from '../components/UsageChart.vue';
 import ServerFilters from '../components/ServerFilters.vue';
 import ServersTable from '../components/ServersTable.vue';
+import filterMethods from '../helpers/filterMethods';
 
 export default {
   name: 'DashboardView',
@@ -55,6 +56,13 @@ export default {
         memory: Math.round(avgMemory * 100) / 100,
         disk: Math.round(avgDisk * 100) / 100
       };
+    });
+
+    const filteredAverageHealth = computed(() => {
+      const servers = serversStore.filteredServers;
+      if (servers.length === 0) return 0;
+      const total = servers.reduce((sum, s) => sum + (s.healthScore || 0), 0);
+      return Math.round(total / servers.length);
     });
 
     const getStatusColor = (status) => {
@@ -147,13 +155,15 @@ export default {
       averageUsage,
       filteredStatusCounts,
       filteredAverageUsage,
+      filteredAverageHealth,
       autoRefreshEnabled,
       autoRefreshInterval,
       getStatusColor,
       formatLastUpdated,
       refreshData,
       toggleAutoRefresh,
-      updateAutoRefreshInterval
+      updateAutoRefreshInterval,
+      ...filterMethods
     };
   }
 };
@@ -245,14 +255,21 @@ export default {
     </div>
 
     <!-- Server Filters -->
-    <ServerFilters :showing-max="10" />
+    <ServerFilters :showing-max="10" :-display-showing-count="false" />
 
     <!-- Stats Overview -->
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
       <div class="card p-6">
         <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Servers</h3>
         <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">
           {{ serversStore.filteredServers.length }}
+        </p>
+      </div>
+      
+      <div class="card p-6">
+        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Average Health</h3>
+        <p class="text-3xl font-bold" :class="getHealthColor(filteredAverageHealth)">
+          {{ filteredAverageHealth }}
         </p>
       </div>
       

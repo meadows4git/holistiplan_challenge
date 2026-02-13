@@ -11,8 +11,14 @@ const formatUptime = (seconds) => {
   return `${Math.floor(seconds / 60)}m`;
 };
 
+const getHealthColor = (health) => {
+  if (health >= 70) return 'text-green-600 dark:text-green-400';
+  if (health >= 40) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-red-600 dark:text-red-400';
+};
 
 export default {
   formatPercent,
-  formatUptime
+  formatUptime,
+  getHealthColor
 };
