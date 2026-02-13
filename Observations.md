@@ -27,6 +27,7 @@ Please provide a brief description of how you used it:
 **Observed Bugs**
   - CPU usage in backend appears to be stored as decimal (0-1) but displayed inconsistently (sometimes as %, sometimes as decimal) - Normalized backend decimal values (0-1) to percentage (0-100) within the Pinia store to ensure UI consistency.
   - Site is not mobile friendly, left nav is biggest issue, a start of a "simple" fix would be a hamburger menu.
+  - `Basic users can change their permission type to Admin, this is a security issue and of HIGH PRIORITY.`
 
 **Other Insights**
   - The application has good separation of concerns with Pinia store handling state management
