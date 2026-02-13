@@ -286,6 +286,56 @@ def delete_server(server_id):
     db.session.commit()
     return jsonify({'message': 'Server deleted successfully'}), 200
 
+# Bulk operations routes
+@app.route('/api/servers/bulk/delete', methods=['POST'])
+@login_required
+def bulk_delete_servers():
+    data = request.get_json()
+    server_ids = data.get('server_ids', [])
+    
+    if not server_ids:
+        return jsonify({'error': 'No server IDs provided'}), 400
+    
+    deleted_count = 0
+    for server_id in server_ids:
+        server = Server.query.get(server_id)
+        if server:
+            db.session.delete(server)
+            deleted_count += 1
+    
+    db.session.commit()
+    return jsonify({
+        'message': f'{deleted_count} server(s) deleted successfully',
+        'deleted_count': deleted_count
+    }), 200
+
+@app.route('/api/servers/bulk/update-status', methods=['POST'])
+@login_required
+def bulk_update_status():
+    data = request.get_json()
+    server_ids = data.get('server_ids', [])
+    new_status = data.get('status')
+    
+    if not server_ids:
+        return jsonify({'error': 'No server IDs provided'}), 400
+    
+    if not new_status or new_status not in ['online', 'offline', 'maintenance', 'error']:
+        return jsonify({'error': 'Invalid status'}), 400
+    
+    updated_count = 0
+    for server_id in server_ids:
+        server = Server.query.get(server_id)
+        if server:
+            server.status = new_status
+            server.updated_at = datetime.utcnow()
+            updated_count += 1
+    
+    db.session.commit()
+    return jsonify({
+        'message': f'{updated_count} server(s) updated successfully',
+        'updated_count': updated_count
+    }), 200
+
 # Dashboard stats route
 @app.route('/api/dashboard/stats', methods=['GET'])
 @login_required

@@ -23,6 +23,9 @@ export const useServersStore = defineStore('servers', () => {
     direction: '' // 'asc' or 'desc'
   });
 
+  // Bulk operations - selected server IDs
+  const selectedServerIds = ref(new Set());
+
   const serversByStatus = computed(() => {
     const grouped = {
       online: [],
@@ -281,7 +284,72 @@ export const useServersStore = defineStore('servers', () => {
       isLoading.value = false;
     }
   };
+  // Bulk operations
+  const toggleServerSelection = (serverId) => {
+    if (selectedServerIds.value.has(serverId)) {
+      selectedServerIds.value.delete(serverId);
+    } else {
+      selectedServerIds.value.add(serverId);
+    }
+  };
 
+  const toggleAllServers = (serverIds) => {
+    if (selectedServerIds.value.size === serverIds.length) {
+      selectedServerIds.value.clear();
+    } else {
+      selectedServerIds.value = new Set(serverIds);
+    }
+  };
+
+  const clearSelection = () => {
+    selectedServerIds.value.clear();
+  };
+
+  const bulkDeleteServers = async () => {
+    if (selectedServerIds.value.size === 0) return;
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const ids = Array.from(selectedServerIds.value);
+      await serversAPI.bulkDelete(ids);
+      servers.value = servers.value.filter(s => !selectedServerIds.value.has(s.id));
+      clearSelection();
+    } catch (err) {
+      error.value = err.response?.data?.error || 'Failed to delete servers';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const bulkUpdateStatus = async (newStatus) => {
+    if (selectedServerIds.value.size === 0) return;
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const ids = Array.from(selectedServerIds.value);
+      await serversAPI.bulkUpdateStatus(ids, newStatus);
+
+      // Update the status in local state
+      servers.value = servers.value.map(server => {
+        if (selectedServerIds.value.has(server.id)) {
+          return { ...server, status: newStatus };
+        }
+        return server;
+      });
+
+      clearSelection();
+    } catch (err) {
+      error.value = err.response?.data?.error || 'Failed to update servers';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  };
   const getServerById = (id) => {
     return servers.value.find(s => s.id === parseInt(id));
   };
@@ -306,6 +374,7 @@ export const useServersStore = defineStore('servers', () => {
     filteredServers,
     filteredServersByStatus,
     uniqueLocations,
+    selectedServerIds,
     fetchServers,
     fetchDashboardStats,
     refreshDashboard,
@@ -316,6 +385,11 @@ export const useServersStore = defineStore('servers', () => {
     createServer,
     updateServer,
     deleteServer,
+    toggleServerSelection,
+    toggleAllServers,
+    clearSelection,
+    bulkDeleteServers,
+    bulkUpdateStatus,
     getServerById,
     clearError
   };
