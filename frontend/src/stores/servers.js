@@ -99,14 +99,14 @@ export const useServersStore = defineStore('servers', () => {
     }
 
     if (filters.value.searchText) {
-      const search = filters.value.searchText.toLowerCase();
+      const search = filters.value.searchText.trim().toLowerCase();
       filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(search)
       );
     }
 
     if (filters.value.ipAddress) {
-      const ipSearch = filters.value.ipAddress.toLowerCase();
+      const ipSearch = filters.value.ipAddress.trim().toLowerCase();
       filtered = filtered.filter(s =>
         s.ip_address.toLowerCase().includes(ipSearch)
       );
