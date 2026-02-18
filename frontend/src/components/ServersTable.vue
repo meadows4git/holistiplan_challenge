@@ -1,5 +1,6 @@
 <script>
 import { useServersStore } from '../stores/servers';
+import { computed } from 'vue';
 import filterMethods from '../helpers/filterMethods';
 
 export default {
@@ -75,12 +76,12 @@ export default {
       return serversStore.sortConfig.direction === 'asc' ? '↑' : '↓';
     };
 
-    const displayedServers = () => {
+    const displayedServers = computed(() => {
       if (props.maxRows) {
         return props.servers.slice(0, props.maxRows);
       }
       return props.servers;
-    };
+    });
 
     const handleEdit = (server) => {
       emit('edit', server);
@@ -112,7 +113,7 @@ export default {
   <div class="card overflow-hidden">
     <div v-if="title" class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ title }}</h3>
-      <div v-if="maxRows" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ displayedServers().length }} servers</div>
+      <div v-if="maxRows" class="text-sm text-gray-500 dark:text-gray-400">Showing {{ displayedServers.length }} servers</div>
     </div>
 
     <div class="overflow-x-auto">
@@ -197,7 +198,7 @@ export default {
         </thead>
         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           <tr
-            v-for="server in displayedServers()"
+            v-for="server in displayedServers"
             :key="server.id"
           >
             <td v-if="showBulkSelection" class="px-6 py-4 whitespace-nowrap">
