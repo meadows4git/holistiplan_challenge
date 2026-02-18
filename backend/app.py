@@ -286,6 +286,57 @@ def delete_server(server_id):
     db.session.commit()
     return jsonify({'message': 'Server deleted successfully'}), 200
 
+# Bulk operations routes
+@app.route('/api/servers/bulk/delete', methods=['POST'])
+@login_required
+def bulk_delete_servers():
+    data = request.get_json()
+    server_ids = data.get('server_ids', [])
+    
+    if not server_ids:
+        return jsonify({'error': 'No server IDs provided'}), 400
+    
+    try:
+        deleted_count = Server.query.filter(Server.id.in_(server_ids)).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({
+            'message': f'{deleted_count} server(s) deleted successfully',
+            'deleted_count': deleted_count
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete servers'}), 500
+
+@app.route('/api/servers/bulk/update-status', methods=['POST'])
+@login_required
+def bulk_update_status():
+    data = request.get_json()
+    server_ids = data.get('server_ids', [])
+    new_status = data.get('status')
+    
+    if not server_ids:
+        return jsonify({'error': 'No server IDs provided'}), 400
+    
+    if not new_status or new_status not in ['online', 'offline', 'maintenance', 'error']:
+        return jsonify({'error': 'Invalid status'}), 400
+    
+    try:
+        updated_count = Server.query.filter(Server.id.in_(server_ids)).update(
+            {
+                Server.status: new_status,
+                Server.updated_at: datetime.utcnow()
+            },
+            synchronize_session=False
+        )
+        db.session.commit()
+        return jsonify({
+            'message': f'{updated_count} server(s) updated successfully',
+            'updated_count': updated_count
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to update servers'}), 500
+
 # Dashboard stats route
 @app.route('/api/dashboard/stats', methods=['GET'])
 @login_required
